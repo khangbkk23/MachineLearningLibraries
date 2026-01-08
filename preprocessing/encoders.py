@@ -158,18 +158,48 @@ class OneHotEncoder:
         return self.fit(X).transform(X)
 
 
-X = [
-    ["red", "S"],
-    ["blue", "M"],
-    [np.nan, "M"]
-]
+class MaxAbsScaler:
+    def __init__(self, copy=True):
+        self.copy = copy
+        
+    def fit(self, X, y=None):
+        X = np.array(X, dtype=np.float64)
+        
+        self.max_abs_ = np.max(np.abs(X), axis=0)
+        self.scale_ = self.max_abs_.copy()
+        self.scale_[self.scale_ == 0.0] = 1.0
+        
+        self.n_samples_seen_ = X.shape[0]
+        self.n_features_in_ = X.shape[1]
+        
+        return self
+    
+    def transform(self, X):
+        if not hasattr(self, 'scale_'):
+            raise RuntimeError("Scaler haven't been fitted yet.")
+            
+        X = np.array(X, dtype=np.float64)
+        
+        if self.copy:
+            X = X.copy()
 
-print("Ordinal:")
-print(OrdinalEncoder(encoded_missing_value=-1).fit_transform(X))
+        X /= self.scale_
+        
+        return X
 
-print("OneHot:")
-print(OneHotEncoder().fit_transform(X))
+    def fit_transform(self, X, y=None):
+        return self.fit(X).transform(X)
 
-y = ["yes", "no", "yes"]
-print("Label:")
-print(LabelEncoder().fit_transform(y))
+    def inverse_transform(self, X):
+        if not hasattr(self, 'scale_'):
+            raise RuntimeError("Scaler haven't been fitted yet.")
+            
+        X = np.array(X, dtype=np.float64)
+        
+        if self.copy:
+            X = X.copy()
+            
+        X *= self.scale_
+        
+        return X
+        
