@@ -121,3 +121,206 @@ class LinearRegression:
         
         if v == 0: return 0.0
         return 1 - u / v
+    
+class Ridge:
+    def __init__(self, alpha=1.0, fit_intercept=True, copy_X=True):
+        self.alpha = alpha
+        self.fit_intercept = fit_intercept
+        self.copy_X = copy_X
+        
+    def fit(self, X, y):
+        X = np.array(X, dtype=np.float64)
+        y = np.array(y, dtype=np.float64)
+
+        if self.copy_X:
+            X = X.copy()
+            y = y.copy()
+
+        n_samples, n_features = X.shape
+        
+        if self.fit_intercept:
+            X_mean = np.mean(X, axis=0)
+            y_mean = np.mean(y, axis=0)
+            X -= X_mean
+            y -= y_mean
+        else:
+            X_mean = np.zeros(n_features)
+            y_mean = 0.0
+
+        XtX = X.T @ X
+
+        A = XtX + self.alpha * np.eye(n_features)
+
+        Xty = X.T @ y
+        # A * w = b
+        try:
+            self.coef_ = np.linalg.solve(A, Xty)
+        except np.linalg.LinAlgError:
+            self.coef_ = np.linalg.lstsq(A, Xty, rcond=None)[0]
+
+        if self.fit_intercept:
+            self.intercept_ = y_mean - np.dot(X_mean, self.coef_)
+        else:
+            self.intercept_ = 0.0
+
+        return self
+
+    def predict(self, X):
+        X = np.array(X)
+        return X @ self.coef_ + self.intercept_
+    
+class Lasso:
+    def __init__(self, alpha=1.0, fit_intercept=True, max_iter=1000, tol=1e-4, selection='cyclic'):
+        self.alpha = alpha
+        self.fit_intercept = fit_intercept
+        self.max_iter = max_iter
+        self.tol = tol
+        self.selection = selection
+
+    def fit(self, X, y):
+        X = np.array(X, dtype=np.float64)
+        y = np.array(y, dtype=np.float64)
+        n_samples, n_features = X.shape
+
+        if self.fit_intercept:
+            X_mean = np.mean(X, axis=0)
+            y_mean = np.mean(y)
+            X = X - X_mean
+            y = y - y_mean
+
+        w = np.zeros(n_features)
+
+        norm_cols_X = np.sum(X**2, axis=0)
+        for iteration in range(self.max_iter):
+            w_old = w.copy()
+            
+            # Thứ tự duyệt features
+            if self.selection == 'random':
+                features_idx = np.random.permutation(n_features)
+            else:
+                features_idx = range(n_features)
+
+            max_change = 0.0
+
+            for j in features_idx:
+                if norm_cols_X[j] == 0:
+                    continue
+                
+                predictions = X @ w
+                residual = y - predictions
+                rho = np.dot(X[:, j], residual + X[:, j] * w[j])
+                
+                w[j] = self._soft_threshold(rho, self.alpha * n_samples) / norm_cols_X[j]
+                
+                max_change = max(max_change, abs(w[j] - w_old[j]))
+
+            
+            if max_change < self.tol:
+                break
+        
+        self.coef_ = w
+        
+        if self.fit_intercept:
+            self.intercept_ = y_mean - np.dot(X_mean, self.coef_)
+        else:
+            self.intercept_ = 0.0
+            
+        self.n_iter_ = iteration + 1
+        return self
+
+    def _soft_threshold(self, rho, lam):
+        if rho > lam:
+            return rho - lam
+        elif rho < -lam:
+            return rho + lam
+        else:
+            return 0.0
+
+    def predict(self, X):
+        X = np.array(X)
+        return X @ self.coef_ + self.intercept_
+
+class ElasticNet:
+    def __init__(self, alpha=1.0, l1_ratio=0.5, fit_intercept=True, max_iter=1000, tol=1e-4, selection='cyclic', copy_X=True):
+        self.alpha = alpha
+        self.l1_ratio = l1_ratio
+        self.fit_intercept = fit_intercept
+        self.max_iter = max_iter
+        self.tol = tol
+        self.selection = selection
+        self.copy_X = copy_X
+        
+    def fit(self, X, y):
+        X = np.array(X, dtype=np.float64)
+        y = np.array(y, dtype=np.float64)
+        
+        if self.copy_X:
+            X = X.copy()
+            y = y.copy()
+        
+        n_samples, n_features = X.shape
+        
+        if self.fit_intercept:
+            X_mean = np.mean(X, axis=0)
+            y_mean = np.mean(y)
+            
+            X = X - X_mean
+            y = y - y_mean
+            
+        w = np.zeros(n_features)
+        norm_cols_X = np.sum(X**2, axis=0)
+        
+        l1_reg = self.alpha * self.l1_ratio * n_samples
+        l2_reg = self.alpha * (1.0 - self.l1_ratio) *n_samples
+        
+        for iteration in range(self.max_iter):
+            w_old = w.copy()
+            if self.selection == 'random':
+                features_idx = np.random.permutation(n_features)
+            else:
+                features_idx = range(n_features)
+
+            max_change = 0.0
+
+            for j in features_idx:
+                if norm_cols_X[j] == 0:
+                    continue
+
+                predictions = X @ w
+                residual = y - predictions
+                rho = np.dot(X[:, j], residual + X[:, j] * w[j])
+                
+                # Tử số: Soft Thresholding
+                numerator = self._soft_threshold(rho, l1_reg)
+                
+                # Mẫu số: Norm + L2 Penalty
+                denominator = norm_cols_X[j] + l2_reg
+                
+                w[j] = numerator / denominator
+                
+                max_change = max(max_change, abs(w[j] - w_old[j]))
+
+            if max_change < self.tol:
+                break
+        
+        self.coef_ = w
+        
+        if self.fit_intercept:
+            self.intercept_ = y_mean - np.dot(X_mean, self.coef_)
+        else:
+            self.intercept_ = 0.0
+            
+        self.n_iter_ = iteration + 1
+        return self
+
+    def _soft_threshold(self, rho, lam):
+        if rho > lam:
+            return rho - lam
+        elif rho < -lam:
+            return rho + lam
+        else:
+            return 0.0
+
+    def predict(self, X):
+        X = np.array(X)
+        return X @ self.coef_ + self.intercept_
