@@ -1,4 +1,3 @@
-from django.urls import include
 import numpy
 from preprocessing.features import PolynomialFeatures
 from regression.linear.linear_regression import LinearRegression
