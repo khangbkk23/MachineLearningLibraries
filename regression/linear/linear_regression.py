@@ -1,6 +1,6 @@
 import numpy as np
 
-class LinearRegression:
+class LinearRegressor:
     def __init__(self, fit_intercept=True, copy_X=True, n_jobs=None, positive=False):
         self.fit_intercept = fit_intercept
         self.copy_X = copy_X

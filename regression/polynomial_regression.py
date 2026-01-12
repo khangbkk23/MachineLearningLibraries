@@ -1,7 +1,7 @@
 import numpy
 from preprocessing.features import PolynomialFeatures
-from regression.linear.linear_regression import LinearRegression
-class PolynomialRegression(LinearRegression):
+from regression.linear.linear_regression import LinearRegressor
+class PolynomialRegressor(LinearRegressor):
     def __init__(self, degree=2, interaction_only=False, include_bias=False, fit_intercept=True, copy_X=True, n_jobs=None, positive=False):
         super().__init__(fit_intercept=fit_intercept, copy_X=copy_X, 
                          n_jobs=n_jobs, positive=positive)
